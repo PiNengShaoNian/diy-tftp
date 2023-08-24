@@ -1,7 +1,9 @@
 #ifndef TFTP_BASE_H
 #define TFTP_BASE_H
 
+#include <arpa/inet.h>
 #include <stdint.h>
+#include <sys/socket.h>
 
 typedef enum _tftp_op_t {
   TFTP_PKT_RRQ = 1,
@@ -13,6 +15,8 @@ typedef enum _tftp_op_t {
 } tftp_op_t;
 
 #define TFTP_BLK_SIZE 8192
+
+#define TFTP_DEF_PORT 69
 
 #pragma pack(1)
 
@@ -43,6 +47,11 @@ typedef struct _tftp_packet_t {
     } err;
   };
 } tftp_packet_t;
+
+typedef struct _tftp_t {
+  int socket;
+  struct sockaddr remote;
+} tftp_t;
 
 #pragma pack()
 

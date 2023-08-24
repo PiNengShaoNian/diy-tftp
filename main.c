@@ -1,6 +1,10 @@
 #include <stdio.h>
 
+#include "tftp_client.h"
+
 int main(void) {
-  printf("hello, world\n");
+  const char *ip = "192.168.31.141";
+  tftp_get(ip, TFTP_DEF_PORT, 512, "1.jpg");
+
   return 0;
 }
