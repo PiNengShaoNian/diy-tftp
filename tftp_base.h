@@ -48,11 +48,17 @@ typedef struct _tftp_packet_t {
   };
 } tftp_packet_t;
 
+#pragma pack()
+
 typedef struct _tftp_t {
   int socket;
   struct sockaddr remote;
+
+  int tx_size;
+  tftp_packet_t tx_packet;
 } tftp_t;
 
-#pragma pack()
+int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
+                      uint32_t file_size);
 
 #endif
