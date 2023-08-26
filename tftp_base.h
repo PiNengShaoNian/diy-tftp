@@ -60,5 +60,7 @@ typedef struct _tftp_t {
 
 int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
                       uint32_t file_size);
+int tftp_send_ack(tftp_t *tftp, uint16_t block_num);
+int tftp_send_data(tftp_t *tftp, uint16_t block_num, size_t size);
 
 #endif

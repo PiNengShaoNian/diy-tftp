@@ -58,3 +58,33 @@ int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
 
   return 0;
 }
+
+int tftp_send_ack(tftp_t *tftp, uint16_t block_num) {
+  tftp_packet_t *pkt = &tftp->tx_packet;
+
+  pkt->opcode = htons(TFTP_PKT_ACK);
+  pkt->ack.block = htons(block_num);
+
+  int err = tftp_send_packet(tftp, pkt, 4);
+  if (err < 0) {
+    printf("tftp: send ack failed. block num=%d\n", block_num);
+    return -1;
+  }
+
+  return 0;
+}
+
+int tftp_send_data(tftp_t *tftp, uint16_t block_num, size_t size) {
+  tftp_packet_t *pkt = &tftp->tx_packet;
+
+  pkt->opcode = htons(TFTP_PKT_DATA);
+  pkt->data.block = htons(block_num);
+
+  int err = tftp_send_packet(tftp, pkt, 4 + (int)size);
+  if (err < 0) {
+    printf("tftp: send data failed. block num=%d\n", block_num);
+    return -1;
+  }
+
+  return 0;
+}

@@ -31,7 +31,9 @@ static int do_tftp_get(int block_size, const char *ip, uint16_t port,
     return -1;
   }
 
-  tftp_send_request(&tftp, 1, filename, 0);
+  // tftp_send_request(&tftp, 1, filename, 0);
+  tftp_send_ack(&tftp, 1);
+  tftp_send_data(&tftp, 0, 32);
 
   tftp_close();
   return 0;
