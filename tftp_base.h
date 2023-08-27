@@ -5,6 +5,19 @@
 #include <stdint.h>
 #include <sys/socket.h>
 
+typedef enum _tftp_err_t {
+  TFTP_ERR_OK = 0,
+  TFTP_ERR_NO_FILE,
+  TFTP_ERR_ACC_VIO,
+  TFTP_ERR_DISK_FULL,
+  TFTP_ERR_OP,
+  TFTP_ERR_UNKNOWN_TID,
+  TFTP_ERR_FILE_EXIST,
+  TFTP_ERR_USER,
+
+  TFTP_ERR_END,
+} tftp_err_t;
+
 typedef enum _tftp_op_t {
   TFTP_PKT_RRQ = 1,
   TFTP_PKT_WRQ,
@@ -62,5 +75,6 @@ int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
                       uint32_t file_size);
 int tftp_send_ack(tftp_t *tftp, uint16_t block_num);
 int tftp_send_data(tftp_t *tftp, uint16_t block_num, size_t size);
+int tftp_send_error(tftp_t *tftp, uint16_t code);
 
 #endif
