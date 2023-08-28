@@ -125,3 +125,17 @@ int tftp_send_error(tftp_t *tftp, uint16_t code) {
 
   return 0;
 }
+
+int tftp_wait_packet(tftp_t *tftp, tftp_op_t op, uint16_t block,
+                     size_t *pkt_size) {
+  tftp_packet_t *pkt = &tftp->rx_packet;
+  socklen_t len = sizeof(struct sockaddr);
+  ssize_t size = recvfrom(tftp->socket, (uint8_t *)pkt, sizeof(tftp_packet_t),
+                          0, &tftp->remote, &len);
+  uint16_t opcode = ntohs(pkt->opcode);
+  if (opcode != op) {
+  }
+
+  *pkt_size = (size_t)size;
+  return 0;
+}

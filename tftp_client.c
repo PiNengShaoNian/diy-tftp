@@ -31,13 +31,25 @@ static int do_tftp_get(int block_size, const char *ip, uint16_t port,
     return -1;
   }
 
-  // tftp_send_request(&tftp, 1, filename, 0);
-  tftp_send_ack(&tftp, 1);
-  tftp_send_data(&tftp, 0, 32);
-  tftp_send_error(&tftp, TFTP_ERR_OP);
+  int err = tftp_send_request(&tftp, 1, filename, 0);
+  if (err < 0) {
+    printf("tftp: send tftp request failed.\n");
+    goto get_error;
+  }
+
+  size_t recv_size = 0;
+  err = tftp_wait_packet(&tftp, TFTP_PKT_DATA, 0, &recv_size);
+  if (err < 0) {
+    printf("tftp: wait error, block %d file %s\n", 0, filename);
+    goto get_error;
+  }
 
   tftp_close();
   return 0;
+
+get_error:
+  tftp_close();
+  return -1;
 }
 
 int tftp_get(const char *ip, uint16_t port, int block_size,
