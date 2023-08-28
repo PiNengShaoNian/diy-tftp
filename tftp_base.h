@@ -68,6 +68,7 @@ typedef struct _tftp_t {
   struct sockaddr remote;
 
   int tx_size;
+  int block_size;
   tftp_packet_t tx_packet;
   tftp_packet_t rx_packet;
 } tftp_t;

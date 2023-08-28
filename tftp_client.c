@@ -6,7 +6,7 @@
 
 static tftp_t tftp;
 
-static int tftp_open(const char *ip, uint16_t port) {
+static int tftp_open(const char *ip, uint16_t port, int block_size) {
   int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
   if (sockfd < 0) {
     printf("error: create socket failed.\n");
@@ -14,6 +14,7 @@ static int tftp_open(const char *ip, uint16_t port) {
   }
 
   tftp.socket = sockfd;
+  tftp.block_size = block_size;
 
   struct sockaddr_in *sockaddr = (struct sockaddr_in *)(&tftp.remote);
   memset(sockaddr, 0, sizeof(struct sockaddr_in));
@@ -26,7 +27,7 @@ static void tftp_close() { close(tftp.socket); }
 
 static int do_tftp_get(int block_size, const char *ip, uint16_t port,
                        const char *filename) {
-  if (tftp_open(ip, port) < 0) {
+  if (tftp_open(ip, port, block_size) < 0) {
     printf("tftp connect failed.\n");
     return -1;
   }
@@ -37,17 +38,60 @@ static int do_tftp_get(int block_size, const char *ip, uint16_t port,
     goto get_error;
   }
 
-  size_t recv_size = 0;
-  err = tftp_wait_packet(&tftp, TFTP_PKT_DATA, 0, &recv_size);
-  if (err < 0) {
-    printf("tftp: wait error, block %d file %s\n", 0, filename);
+  FILE *file = fopen(filename, "wb");
+  if (file == NULL) {
+    printf("tftp: create local file failed: %s\n", filename);
     goto get_error;
   }
 
+  uint16_t next_block = 1;
+  uint32_t total_size = 0;
+  uint32_t total_block = 0;
+  while (1) {
+    size_t recv_size = 0;
+    err = tftp_wait_packet(&tftp, TFTP_PKT_DATA, next_block, &recv_size);
+    if (err < 0) {
+      printf("tftp: wait error, block %d file %s\n", 0, filename);
+      goto get_error;
+    }
+
+    size_t block_size = recv_size - 4;
+    if (block_size) {
+      size_t size = fwrite(tftp.rx_packet.data.data, 1, block_size, file);
+      if (size < block_size) {
+        printf("tftp: write file failed: %s\n", filename);
+        goto get_error;
+      }
+    }
+
+    err = tftp_send_ack(&tftp, next_block);
+
+    if (err < 0) {
+      printf("tftp: send ack failed. ack block=%d\n", next_block);
+      goto get_error;
+    }
+    next_block++;
+
+    total_size += (uint32_t)block_size;
+    if (++total_block % 0x40 == 0) {
+      printf(".");
+      fflush(stdout);
+    }
+    if (block_size < tftp.block_size) {
+      err = 0;
+      break;
+    }
+  }
+
+  printf("\n\ttftp: total recv: %d bytes, %d block", total_size, total_block);
+  fclose(file);
   tftp_close();
   return 0;
 
 get_error:
+  if (file) {
+    fclose(file);
+  }
   tftp_close();
   return -1;
 }
