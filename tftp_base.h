@@ -69,6 +69,7 @@ typedef struct _tftp_t {
 
   int tx_size;
   int block_size;
+  int file_size;
   tftp_packet_t tx_packet;
   tftp_packet_t rx_packet;
 } tftp_t;
@@ -80,5 +81,6 @@ int tftp_send_data(tftp_t *tftp, uint16_t block_num, size_t size);
 int tftp_send_error(tftp_t *tftp, uint16_t code);
 int tftp_wait_packet(tftp_t *tftp, tftp_op_t op, uint16_t block,
                      size_t *pkt_size);
+int tftp_parse_oack(tftp_t *tftp);
 
 #endif

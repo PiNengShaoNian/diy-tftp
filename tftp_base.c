@@ -1,6 +1,7 @@
 #include "tftp_base.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 const char *tftp_err_msg(tftp_err_t err) {
@@ -159,5 +160,44 @@ int tftp_wait_packet(tftp_t *tftp, tftp_op_t op, uint16_t block,
   }
 
   *pkt_size = (size_t)size;
+
+  switch (opcode) {
+    case TFTP_PKT_OACK:
+      tftp_parse_oack(tftp);
+      break;
+    default:
+      break;
+  }
   return 0;
+}
+
+int tftp_parse_oack(tftp_t *tftp) {
+  char *buf = (char *)tftp->rx_packet.oack.option;
+  char *end = (char *)&tftp->rx_packet + sizeof(tftp_packet_t);
+
+  while ((buf < end) && (*buf)) {
+    if (strcmp(buf, "blksize") == 0) {
+      buf += strlen(buf) + 1;
+      int blksize = atoi(buf);
+      if (blksize == 0) {
+        printf("tftp: unknown blksize\n");
+        tftp_send_error(tftp, TFTP_ERR_OP);
+        return -1;
+      } else if (blksize < tftp->block_size) {
+        tftp->block_size = blksize;
+        printf("tftp: use new blksize %d\n", blksize);
+      } else if (blksize > tftp->block_size) {
+        printf("tftp: block size %d\n", blksize);
+        return -1;
+      }
+      buf += strlen(buf) + 1;
+    } else if (strcmp(buf, "tsize") == 0) {
+      buf += strlen(buf) + 1;
+      tftp->file_size = atoi(buf);
+
+      buf += strlen(buf) + 1;
+    } else {
+      buf += strlen(buf) + 1;
+    }
+  }
 }
