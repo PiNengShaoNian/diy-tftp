@@ -38,6 +38,23 @@ static int do_tftp_get(int block_size, const char *ip, uint16_t port,
     goto get_error;
   }
 
+  if (option) {
+    size_t recv_size = 0;
+    err = tftp_wait_packet(&tftp, TFTP_PKT_OACK, 0, &recv_size);
+    if (err < 0) {
+      printf("tftp: wait oack error, file %s\n", filename);
+      goto get_error;
+    }
+
+    err = tftp_send_ack(&tftp, 0);
+    if (err < 0) {
+      printf("tftp: send ack failed. file: %s\n", filename);
+      goto get_error;
+    }
+
+    printf("tftp: file size %d bytes\n", tftp.file_size);
+  }
+
   FILE *file = fopen(filename, "wb");
   if (file == NULL) {
     printf("tftp: create local file failed: %s\n", filename);
