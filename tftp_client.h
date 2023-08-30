@@ -4,8 +4,8 @@
 #include "tftp_base.h"
 
 int tftp_get(const char *ip, uint16_t port, int block_size,
-             const char *filename);
+             const char *filename, int option);
 int tftp_put(const char *ip, uint16_t port, int block_size,
-             const char *filename);
+             const char *filename, int option);
 
 #endif

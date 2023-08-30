@@ -28,7 +28,7 @@ typedef enum _tftp_op_t {
 } tftp_op_t;
 
 #define TFTP_BLK_SIZE 8192
-
+#define TFTP_DEF_BLKSIZE 512
 #define TFTP_DEF_PORT 69
 
 #pragma pack(1)
@@ -74,7 +74,7 @@ typedef struct _tftp_t {
 } tftp_t;
 
 int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
-                      uint32_t file_size);
+                      uint32_t file_size, int option);
 int tftp_send_ack(tftp_t *tftp, uint16_t block_num);
 int tftp_send_data(tftp_t *tftp, uint16_t block_num, size_t size);
 int tftp_send_error(tftp_t *tftp, uint16_t code);

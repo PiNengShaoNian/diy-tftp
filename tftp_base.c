@@ -34,6 +34,16 @@ static char *write_option(tftp_t *tftp, char *buf, const char *name,
   strcpy(buf, name);
   buf += len;
 
+  if (value >= 0) {
+    if (buf + 16 >= buf_end) {
+      printf("tftp: send buffer too small");
+      return NULL;
+    }
+
+    sprintf(buf, "%d", value);
+    buf += strlen(buf) + 1;
+  }
+
   return buf;
 }
 
@@ -50,7 +60,7 @@ int tftp_send_packet(tftp_t *tftp, tftp_packet_t *pkt, int size) {
 }
 
 int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
-                      uint32_t file_size) {
+                      uint32_t file_size, int option) {
   tftp_packet_t *pkt = &tftp->tx_packet;
 
   pkt->opcode = htons(is_read ? TFTP_PKT_RRQ : TFTP_PKT_WRQ);
@@ -66,6 +76,18 @@ int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
   if (buf == NULL) {
     printf("tftp: filename too long: %s\n", filename);
     return -1;
+  }
+
+  if (option) {
+    buf = write_option(tftp, buf, "blksize", tftp->block_size);
+    if (buf == NULL) {
+      return -1;
+    }
+
+    buf = write_option(tftp, buf, "tsize", file_size);
+    if (buf == NULL) {
+      return -1;
+    }
   }
 
   int size = (int)(buf - (char *)pkt->req.args) + 2;

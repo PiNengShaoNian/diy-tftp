@@ -26,13 +26,13 @@ static int tftp_open(const char *ip, uint16_t port, int block_size) {
 static void tftp_close() { close(tftp.socket); }
 
 static int do_tftp_get(int block_size, const char *ip, uint16_t port,
-                       const char *filename) {
+                       const char *filename, int option) {
   if (tftp_open(ip, port, block_size) < 0) {
     printf("tftp connect failed.\n");
     return -1;
   }
 
-  int err = tftp_send_request(&tftp, 1, filename, 0);
+  int err = tftp_send_request(&tftp, 1, filename, 0, option);
   if (err < 0) {
     printf("tftp: send tftp request failed.\n");
     goto get_error;
@@ -97,18 +97,22 @@ get_error:
 }
 
 int tftp_get(const char *ip, uint16_t port, int block_size,
-             const char *filename) {
+             const char *filename, int option) {
   printf("try to get file %s from %s\n", filename, ip);
 
   if (block_size > TFTP_BLK_SIZE) {
     block_size = TFTP_BLK_SIZE;
   }
 
-  return do_tftp_get(block_size, ip, port, filename);
+  return do_tftp_get(block_size, ip, port, filename, option);
 }
 
 static int do_tftp_put(int block_size, const char *ip, uint16_t port,
-                       const char *filename) {
+                       const char *filename, int option) {
+  if (!option) {
+    block_size = TFTP_DEF_BLKSIZE;
+  }
+
   if (tftp_open(ip, port, block_size) < 0) {
     printf("tftp connect failed.\n");
     return -1;
@@ -122,14 +126,19 @@ static int do_tftp_put(int block_size, const char *ip, uint16_t port,
 
   printf("tftp: try to put file: %s\n", filename);
 
-  int err = tftp_send_request(&tftp, 0, filename, 0);
+  fseek(file, 0, SEEK_END);
+  long filesize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+
+  int err = tftp_send_request(&tftp, 0, filename, filesize, option);
   if (err < 0) {
     printf("tftp: send tftp request failed.\n");
     goto put_error;
   }
 
   size_t recv_size;
-  err = tftp_wait_packet(&tftp, TFTP_PKT_ACK, 0, &recv_size);
+  err = tftp_wait_packet(&tftp, option ? TFTP_PKT_OACK : TFTP_PKT_ACK, 0,
+                         &recv_size);
   if (err < 0) {
     printf("tftp: wait error, block %d file: %s.\n", 0, filename);
     goto put_error;
@@ -186,12 +195,12 @@ put_error:
 }
 
 int tftp_put(const char *ip, uint16_t port, int block_size,
-             const char *filename) {
+             const char *filename, int option) {
   printf("try to get file %s from %s\n", filename, ip);
 
   if (block_size > TFTP_BLK_SIZE) {
     block_size = TFTP_BLK_SIZE;
   }
 
-  return do_tftp_put(block_size, ip, port, filename);
+  return do_tftp_put(block_size, ip, port, filename, option);
 }
