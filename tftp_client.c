@@ -1,6 +1,7 @@
 #include "tftp_client.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -110,7 +111,7 @@ static int do_tftp_get(int block_size, const char *ip, uint16_t port,
     }
   }
 
-  printf("\n\ttftp: total recv: %d bytes, %d block", total_size, total_block);
+  printf("\n\ttftp: total recv: %d bytes, %d block\n", total_size, total_block);
   fclose(file);
   tftp_close();
   return 0;
@@ -208,7 +209,7 @@ static int do_tftp_put(int block_size, const char *ip, uint16_t port,
     }
   }
 
-  printf("\n\ttftp: total send: %d bytes, %d block", total_size, total_block);
+  printf("\n\ttftp: total send: %d bytes, %d block\n", total_size, total_block);
   fclose(file);
   tftp_close();
   return 0;
@@ -230,4 +231,86 @@ int tftp_put(const char *ip, uint16_t port, int block_size,
   }
 
   return do_tftp_put(block_size, ip, port, filename, option);
+}
+
+void show_cmd_list() {
+  printf("usage: cmd arg0 arg1...\n");
+  printf("    get filename -- download file from server\n");
+  printf("    put filename -- upload file from server\n");
+  printf("    blk size -- set block size\n");
+  printf("    quit -- quit\n");
+}
+
+int tftp_start(const char *ip, uint16_t port) {
+  char cmd_buf[TFTP_CMD_BUF_SIZE];
+  int blksize = TFTP_DEF_BLKSIZE;
+  if (port == 0) {
+    port = TFTP_DEF_PORT;
+  }
+
+  printf("welcome to use tftp client\n");
+  show_cmd_list();
+
+  while (1) {
+    printf("tftp >>");
+    fflush(stdout);
+
+    char *buf = fgets(cmd_buf, sizeof(cmd_buf), stdin);
+    if (buf == NULL) {
+      continue;
+    }
+
+    char *cr = strchr(buf, '\n');
+    if (cr) {
+      *cr = '\0';
+    }
+
+    cr = strchr(buf, '\r');
+    if (cr) {
+      *cr = '\0';
+    }
+
+    const char *split = " \t\n";
+    char *cmd = strtok(buf, split);
+    if (cmd) {
+      if (strcmp(cmd, "get") == 0) {
+        char *filename = strtok(NULL, split);
+        if (filename) {
+          do_tftp_get(blksize, ip, port, filename, 1);
+        } else {
+          printf("error: no file\n");
+        }
+      } else if (strcmp(cmd, "put") == 0) {
+        char *filename = strtok(NULL, split);
+        if (filename) {
+          do_tftp_put(blksize, ip, port, filename, 1);
+        } else {
+          printf("error: no file\n");
+        }
+      } else if (strcmp(cmd, "blk") == 0) {
+        char *blk = strtok(NULL, split);
+        if (blk) {
+          int size = atoi(blk);
+          if (size <= 0) {
+            printf("blk size %d error", size);
+            size = TFTP_DEF_BLKSIZE;
+          } else if (size > TFTP_BLK_SIZE) {
+            printf("blk size %d too long, set to %d\n", size, blksize);
+            size = TFTP_DEF_BLKSIZE;
+          }
+
+          blksize = size;
+        } else {
+          printf("error: no size\n");
+        }
+      } else if (strcmp(cmd, "quit") == 0) {
+        printf("quit from tftp client\n");
+        return 0;
+      } else {
+        printf("unknown cmd\n");
+      }
+    }
+  }
+
+  return 0;
 }
