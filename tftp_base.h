@@ -30,6 +30,8 @@ typedef enum _tftp_op_t {
 #define TFTP_BLK_SIZE 8192
 #define TFTP_DEF_BLKSIZE 512
 #define TFTP_DEF_PORT 69
+#define TFTP_MAX_RETRY 10
+#define TFTP_TMO_SEC 3
 
 #pragma pack(1)
 
@@ -66,6 +68,9 @@ typedef struct _tftp_packet_t {
 typedef struct _tftp_t {
   int socket;
   struct sockaddr remote;
+
+  int tmo_sec;
+  int tmo_retry;
 
   int tx_size;
   int block_size;

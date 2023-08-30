@@ -149,26 +149,69 @@ int tftp_send_error(tftp_t *tftp, uint16_t code) {
   return 0;
 }
 
+int tftp_resend(tftp_t *tftp) {
+  tftp_packet_t *pkt = &tftp->tx_packet;
+
+  if (tftp_send_packet(tftp, pkt, tftp->tx_size) < 0) {
+    printf("tftp: resend error.\n");
+    return -1;
+  }
+
+  return 0;
+}
+
 int tftp_wait_packet(tftp_t *tftp, tftp_op_t op, uint16_t block,
                      size_t *pkt_size) {
   tftp_packet_t *pkt = &tftp->rx_packet;
-  socklen_t len = sizeof(struct sockaddr);
-  ssize_t size = recvfrom(tftp->socket, (uint8_t *)pkt, sizeof(tftp_packet_t),
-                          0, &tftp->remote, &len);
-  uint16_t opcode = ntohs(pkt->opcode);
-  if (opcode != op) {
-  }
+  tftp->tmo_retry = TFTP_MAX_RETRY;
+  while (1) {
+    socklen_t len = sizeof(struct sockaddr);
+    ssize_t size = recvfrom(tftp->socket, (uint8_t *)pkt, sizeof(tftp_packet_t),
+                            0, &tftp->remote, &len);
+    if (size < 0) {
+      printf("recv tmo\n");
+      if (--tftp->tmo_retry == 0) {
+        printf("tftp: wait tmo\n");
+        return -1;
+      } else {
+        tftp_resend(tftp);
+        continue;
+      }
+    }
 
-  *pkt_size = (size_t)size;
+    uint16_t opcode = ntohs(pkt->opcode);
+    if (opcode != op) {
+      tftp_resend(tftp);
+      continue;
+    }
 
-  switch (opcode) {
-    case TFTP_PKT_OACK:
-      tftp_parse_oack(tftp);
-      break;
-    default:
-      break;
+    *pkt_size = (size_t)size;
+
+    switch (opcode) {
+      case TFTP_PKT_DATA:
+      case TFTP_PKT_ACK: {
+        if (ntohs(pkt->data.block) != block) {
+          tftp_resend(tftp);
+          break;
+        }
+        return 0;
+      }
+      case TFTP_PKT_ERROR: {
+        pkt->err.msg[tftp->block_size - 1] = '\0';
+        printf("tftp: recv error = %d, reason: %s\n", ntohs(pkt->err.code),
+               pkt->err.msg);
+        return -1;
+      }
+      case TFTP_PKT_OACK: {
+        tftp_parse_oack(tftp);
+        return 0;
+      }
+      default: {
+        tftp_resend(tftp);
+        break;
+      }
+    }
   }
-  return 0;
 }
 
 int tftp_parse_oack(tftp_t *tftp) {

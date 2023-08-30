@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 static tftp_t tftp;
@@ -15,12 +16,21 @@ static int tftp_open(const char *ip, uint16_t port, int block_size) {
 
   tftp.socket = sockfd;
   tftp.block_size = block_size;
+  tftp.file_size = 0;
+  tftp.tmo_retry = TFTP_MAX_RETRY;
+  tftp.tmo_sec = TFTP_TMO_SEC;
 
   struct sockaddr_in *sockaddr = (struct sockaddr_in *)(&tftp.remote);
   memset(sockaddr, 0, sizeof(struct sockaddr_in));
   sockaddr->sin_family = AF_INET;
   sockaddr->sin_addr.s_addr = inet_addr(ip);
   sockaddr->sin_port = htons(port);
+
+  struct timeval tmo;
+  tmo.tv_sec = tftp.tmo_sec;
+  tmo.tv_usec = 0;
+  setsockopt(tftp.socket, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tmo,
+             sizeof(tmo));
 }
 
 static void tftp_close() { close(tftp.socket); }
