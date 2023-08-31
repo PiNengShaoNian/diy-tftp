@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 static const char *server_path;
@@ -20,6 +21,13 @@ static int wait_req(tftp_t *tftp, tftp_req_t *req) {
   req->blksize = TFTP_DEF_BLKSIZE;
   req->filesize = 0;
   memset(req->filename, 0, sizeof(req->filename));
+  memset(&req->tftp, 0, sizeof(req->tftp));
+  memcpy(&req->tftp.remote, &tftp->remote, sizeof(tftp->remote));
+
+  struct sockaddr_in *addr = (struct sockaddr_in *)&tftp->remote;
+  printf("tftp: recv req %s from %s %d\n",
+         req->op == TFTP_PKT_RRQ ? "get" : "put", inet_ntoa(addr->sin_addr),
+         ntohs(addr->sin_port));
 
   char *buf = (char *)pkt->req.args;
   char *end = (char *)pkt + pkt_size;
@@ -64,6 +72,40 @@ static int wait_req(tftp_t *tftp, tftp_req_t *req) {
   }
 }
 
+static void *tftp_working_thread(void *arg) {
+  tftp_req_t *req = (tftp_req_t *)arg;
+  tftp_t *tftp = &req->tftp;
+
+  int sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+  if (sockfd < 0) {
+    printf("tftp: create working socket failed.\n");
+    goto init_error;
+  }
+
+  tftp->socket = sockfd;
+  tftp->tmo_retry = TFTP_MAX_RETRY;
+  tftp->tmo_sec = TFTP_TMO_SEC;
+  tftp->file_size = req->filesize;
+  tftp->block_size = req->blksize;
+
+  if (req->op == TFTP_PKT_WRQ) {
+  } else {
+  }
+
+  struct timeval tmo;
+  tmo.tv_sec = tftp->tmo_sec;
+  tmo.tv_usec = 0;
+  setsockopt(tftp->socket, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tmo,
+             sizeof(tmo));
+
+init_error:
+  if (sockfd >= 0) {
+    close(sockfd);
+  }
+  free(req);
+  return NULL;
+}
+
 static void *tftp_server_thread(void *arg) {
   printf("tftp server is running...\n");
 
@@ -93,6 +135,14 @@ static void *tftp_server_thread(void *arg) {
 
     int err = wait_req(&tftp, req);
     if (err < 0) {
+      free(req);
+      continue;
+    }
+
+    pthread_t thread;
+    err = pthread_create(&thread, NULL, tftp_working_thread, req);
+    if (err != 0) {
+      printf("tftpd: create working thread failed.\n");
       free(req);
       continue;
     }
