@@ -180,7 +180,11 @@ int tftp_wait_packet(tftp_t *tftp, tftp_op_t op, uint16_t block,
     }
 
     uint16_t opcode = ntohs(pkt->opcode);
-    if (opcode != op) {
+    if (op == TFTP_PKT_REQ) {
+      if (opcode != TFTP_PKT_RRQ && opcode != TFTP_PKT_WRQ) {
+        continue;
+      }
+    } else if (opcode != op) {
       tftp_resend(tftp);
       continue;
     }
@@ -201,6 +205,10 @@ int tftp_wait_packet(tftp_t *tftp, tftp_op_t op, uint16_t block,
         printf("tftp: recv error = %d, reason: %s\n", ntohs(pkt->err.code),
                pkt->err.msg);
         return -1;
+      }
+      case TFTP_PKT_RRQ:
+      case TFTP_PKT_WRQ: {
+        return 0;
       }
       case TFTP_PKT_OACK: {
         tftp_parse_oack(tftp);

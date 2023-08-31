@@ -25,6 +25,8 @@ typedef enum _tftp_op_t {
   TFTP_PKT_ACK,
   TFTP_PKT_ERROR,
   TFTP_PKT_OACK,
+
+  TFTP_PKT_REQ,
 } tftp_op_t;
 
 #define TFTP_BLK_SIZE 8192
