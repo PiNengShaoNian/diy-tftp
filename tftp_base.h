@@ -79,6 +79,16 @@ typedef struct _tftp_t {
   tftp_packet_t rx_packet;
 } tftp_t;
 
+#define TFTP_NAME_SIZE 128
+typedef struct _tftp_req_t {
+  tftp_t tftp;
+  tftp_op_t op;
+  int option;
+  int blksize;
+  int filesize;
+  char filename[TFTP_NAME_SIZE];
+} tftp_req_t;
+
 int tftp_send_request(tftp_t *tftp, int is_read, const char *filename,
                       uint32_t file_size, int option);
 int tftp_send_ack(tftp_t *tftp, uint16_t block_num);
