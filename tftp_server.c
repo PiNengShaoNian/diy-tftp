@@ -11,6 +11,67 @@ static const char *server_path;
 static uint16_t server_port;
 static tftp_t tftp;
 
+static int do_send_file(tftp_req_t *req) {
+  tftp_t *tftp = &req->tftp;
+
+  char path_buf[256];
+  if (server_path) {
+    snprintf(path_buf, sizeof(path_buf), "%s/%s", server_path, req->filename);
+  } else {
+    snprintf(path_buf, sizeof(path_buf), "%s", req->filename);
+  }
+
+  FILE *file = fopen(path_buf, "rb");
+  if (file == NULL) {
+    printf("tftpd: file %s does not exist\n", path_buf);
+    tftp_send_error(tftp, TFTP_ERR_NO_FILE);
+    return -1;
+  }
+
+  printf("tftpd: sending file %s...\n", path_buf);
+
+  uint16_t curr_blk = 1;
+  int total_size = 0;
+  int total_block = 0;
+  while (1) {
+    size_t size = fread(tftp->tx_packet.data.data, 1, tftp->block_size, file);
+    if (size < 0) {
+      printf("tftpd: read file %s failed.\n", path_buf);
+      tftp_send_error(tftp, TFTP_ERR_ACC_VIO);
+      goto send_failed;
+    }
+
+    int err = tftp_send_data(tftp, curr_blk, size);
+    if (err < 0) {
+      printf("tftp: send data block failed.\n");
+      goto send_failed;
+    }
+
+    size_t pkt_size;
+    err = tftp_wait_packet(tftp, TFTP_PKT_ACK, curr_blk++, &pkt_size);
+    if (err < 0) {
+      printf("tftp: wait ack failed.\n");
+      goto send_failed;
+    }
+
+    total_size += (int)size;
+    total_block++;
+
+    if (size < tftp->block_size) {
+      break;
+    }
+  }
+
+  printf("tftpd: send %s %d bytes %d blocks\n", path_buf, total_size,
+         total_block);
+  fclose(file);
+  return 0;
+send_failed:
+  printf("tftpd: send failed\n");
+  fclose(file);
+  return -1;
+}
+
 static int wait_req(tftp_t *tftp, tftp_req_t *req) {
   tftp_packet_t *pkt = &tftp->rx_packet;
   size_t pkt_size;
@@ -61,10 +122,6 @@ static int wait_req(tftp_t *tftp, tftp_req_t *req) {
     } else if (strcmp(buf, "tsize") == 0) {
       buf += strlen(buf) + 1;
       req->filesize = atoi(buf);
-      if (req->filesize <= 0) {
-        tftp_send_error(tftp, TFTP_ERR_OP);
-        return -1;
-      }
       buf += strlen(buf) + 1;
     } else {
       buf += strlen(buf) + 1;
@@ -88,15 +145,16 @@ static void *tftp_working_thread(void *arg) {
   tftp->file_size = req->filesize;
   tftp->block_size = req->blksize;
 
-  if (req->op == TFTP_PKT_WRQ) {
-  } else {
-  }
-
   struct timeval tmo;
   tmo.tv_sec = tftp->tmo_sec;
   tmo.tv_usec = 0;
   setsockopt(tftp->socket, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tmo,
              sizeof(tmo));
+
+  if (req->op == TFTP_PKT_WRQ) {
+  } else {
+    do_send_file(req);
+  }
 
 init_error:
   if (sockfd >= 0) {
