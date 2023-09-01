@@ -11,6 +11,75 @@ static const char *server_path;
 static uint16_t server_port;
 static tftp_t tftp;
 
+static int do_recv_file(tftp_req_t *req) {
+  tftp_t *tftp = &req->tftp;
+
+  char path_buf[256];
+  if (server_path) {
+    snprintf(path_buf, sizeof(path_buf), "%s/%s", server_path, req->filename);
+  } else {
+    snprintf(path_buf, sizeof(path_buf), "%s", req->filename);
+  }
+
+  FILE *file = fopen(path_buf, "wb");
+  if (file == NULL) {
+    printf("tftpd: file %s does not exist\n", path_buf);
+    tftp_send_error(tftp, TFTP_ERR_NO_FILE);
+    return -1;
+  }
+
+  printf("tftpd: recv file %s...\n", path_buf);
+
+  int err = req->option ? tftp_send_oack(tftp) : tftp_send_ack(tftp, 0);
+  if (err < 0) {
+    printf("tftpd: send ack failed.\n");
+    fclose(file);
+    return -1;
+  }
+
+  uint16_t curr_blk = 1;
+  int total_size = 0;
+  int total_block = 0;
+  while (1) {
+    size_t pkt_size;
+    err = tftp_wait_packet(tftp, TFTP_PKT_DATA, curr_blk, &pkt_size);
+    if (err < 0) {
+      printf("tftp: wait data failed.\n");
+      goto recv_failed;
+    }
+
+    size_t block_size = pkt_size - 4;
+    if (block_size) {
+      size_t size = fwrite(tftp->rx_packet.data.data, 1, block_size, file);
+      if (size < block_size) {
+        printf("tftpd: write file failed: %s\n", path_buf);
+        goto recv_failed;
+      }
+    }
+
+    int err = tftp_send_ack(tftp, curr_blk++);
+    if (err < 0) {
+      printf("tftp: send ack failed.\n");
+      goto recv_failed;
+    }
+
+    total_size += (int)block_size;
+    total_block++;
+
+    if (block_size < tftp->block_size) {
+      break;
+    }
+  }
+
+  printf("tftpd: recv %s %d bytes %d blocks\n", path_buf, total_size,
+         total_block);
+  fclose(file);
+  return 0;
+recv_failed:
+  fclose(file);
+  return -1;
+}
+
 static int do_send_file(tftp_req_t *req) {
   tftp_t *tftp = &req->tftp;
 
@@ -172,6 +241,7 @@ static void *tftp_working_thread(void *arg) {
              sizeof(tmo));
 
   if (req->op == TFTP_PKT_WRQ) {
+    do_recv_file(req);
   } else {
     do_send_file(req);
   }
