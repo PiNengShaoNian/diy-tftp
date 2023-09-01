@@ -30,6 +30,26 @@ static int do_send_file(tftp_req_t *req) {
 
   printf("tftpd: sending file %s...\n", path_buf);
 
+  fseek(file, 0, SEEK_END);
+  long filesize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+  tftp->file_size = filesize;
+
+  if (req->option) {
+    int err = tftp_send_oack(tftp);
+    if (err < 0) {
+      printf("tftpd: send oack failed.\n");
+      goto send_failed;
+    }
+
+    size_t pkt_size;
+    err = tftp_wait_packet(tftp, TFTP_PKT_ACK, 0, &pkt_size);
+    if (err < 0) {
+      printf("tftp: wait ack failed.\n");
+      goto send_failed;
+    }
+  }
+
   uint16_t curr_blk = 1;
   int total_size = 0;
   int total_block = 0;

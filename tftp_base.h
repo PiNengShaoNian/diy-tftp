@@ -99,5 +99,6 @@ int tftp_send_error(tftp_t *tftp, uint16_t code);
 int tftp_wait_packet(tftp_t *tftp, tftp_op_t op, uint16_t block,
                      size_t *pkt_size);
 int tftp_parse_oack(tftp_t *tftp);
+int tftp_send_oack(tftp_t *tftp);
 
 #endif

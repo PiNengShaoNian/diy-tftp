@@ -252,3 +252,26 @@ int tftp_parse_oack(tftp_t *tftp) {
     }
   }
 }
+
+int tftp_send_oack(tftp_t *tftp) {
+  tftp_packet_t *pkt = &tftp->tx_packet;
+
+  pkt->opcode = htons(TFTP_PKT_OACK);
+  char *buf = pkt->oack.option;
+  buf = write_option(tftp, buf, "blksize", tftp->block_size);
+  if (buf == NULL) {
+    return -1;
+  }
+  buf = write_option(tftp, buf, "tsize", tftp->file_size);
+  if (buf == NULL) {
+    return -1;
+  }
+
+  int err = tftp_send_packet(tftp, pkt, buf - (char *)pkt);
+  if (err < 0) {
+    printf("tftp: send oack failed.\n");
+    return -1;
+  }
+
+  return 0;
+}
